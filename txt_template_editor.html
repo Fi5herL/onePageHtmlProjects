@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Template Editor</title>
+    <style>
+        body {
+            font-family: 'Roboto', Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            color: #4285f4;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        #template, #generatedTemplate {
+            width: 100%;
+            height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 16px;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            resize: none;
+        }
+        button, input[type="file"] {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #4285f4;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover, input[type="file"]:hover {
+            background-color: #357ae8;
+        }
+        .variable-input {
+            display: flex;
+            margin-top: 10px;
+        }
+        .variable-input input {
+            margin-right: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            flex: 1;
+        }
+        .variable-input input:last-child {
+            margin-right: 0;
+        }
+        #variables {
+            margin-top: 20px;
+        }
+        #addVariableBtn {
+            display: block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #34a853;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        #addVariableBtn:hover {
+            background-color: #2c8b4e;
+        }
+        .copy-btn {
+            background-color: #34a853;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-left: 10px;
+        }
+        .copy-btn:hover {
+            background-color: #2c8b4e;
+        }
+        .header-buttons {
+            display: flex;
+            align-items: center;
+        }
+        .header-buttons button, .header-buttons input[type="file"] {
+            margin-left: 10px;
+            margin-top: 0;
+        }
+        .generated-template-container {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>
+        Text Template Editor
+        <div class="header-buttons">
+            <button onclick="generateTemplate()">Generate Template</button>
+            <button onclick="saveTemplate()">Save Template</button>
+            <input type="file" id="fileInput">
+        </div>
+    </h1>
+    <h2>Variables</h2>
+    <div id="variables">
+        <!-- Initial variable input row -->
+        <div class="variable-input">
+            <input type="text" class="varName" placeholder="Variable Name">
+            <input type="text" class="varValue" placeholder="Variable Value">
+        </div>
+    </div>
+    <button id="addVariableBtn" onclick="addVariable()">Add Variable</button>
+    <br>
+    <textarea id="template" placeholder="Enter your template here..."></textarea>
+    <br>
+    <h2>Generated Template</h2>
+    <div class="generated-template-container">
+        <textarea id="generatedTemplate" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard()">Copy</button>
+    </div>
+    
+    <script>
+        let variableInputClicked = false;
+
+        document.getElementById('fileInput').addEventListener('change', loadTemplate);
+        document.addEventListener('click', function(event) {
+            if (variableInputClicked && !document.getElementById('variables').contains(event.target)) {
+                ensureAllVariablesInTemplate();
+                variableInputClicked = false;
+            }
+        });
+        document.getElementById('variables').addEventListener('click', function() {
+            variableInputClicked = true;
+        });
+
+        function generateTemplate() {
+            let template = document.getElementById('template').value;
+            const varNames = document.getElementsByClassName('varName');
+            const varValues = document.getElementsByClassName('varValue');
+            const variables = {};
+
+            for (let i = 0; i < varNames.length; i++) {
+                const name = varNames[i].value;
+                const value = varValues[i].value;
+                if (name) {
+                    variables[name] = value;
+                }
+            }
+
+            for (const [key, value] of Object.entries(variables)) {
+                const regex = new RegExp(`{${key}}`, 'g');
+                template = template.replace(regex, value);
+            }
+
+            document.getElementById('generatedTemplate').value = template;
+        }
+
+        function saveTemplate() {
+            const template = document.getElementById('template').value;
+            const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template.txt';
+            link.click();
+        }
+
+        function loadTemplate(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const templateContent = e.target.result;
+                    document.getElementById('template').value = templateContent;
+                    extractVariables(templateContent);
+                }
+                reader.readAsText(file);
+            } else {
+                alert('No file selected');
+            }
+        }
+
+        function extractVariables(templateContent) {
+            const varNamesSet = new Set();
+            const varInputRows = document.getElementsByClassName('variable-input');
+            const varNames = document.getElementsByClassName('varName');
+            const varValues = document.getElementsByClassName('varValue');
+            const regex = /{([^}]+)}/g;
+            let match;
+            let index = 0;
+
+            while ((match = regex.exec(templateContent)) !== null) {
+                const varName = match[1];
+                if (!varNamesSet.has(varName)) {
+                    varNamesSet.add(varName);
+                    if (index >= varInputRows.length) {
+                        addVariable();
+                    }
+                    varNames[index].value = varName;
+                    varValues[index].value = '';
+                    index++;
+                }
+            }
+
+            // Clear remaining inputs if any
+            for (let i = index; i < varInputRows.length; i++) {
+                varNames[i].value = '';
+                varValues[i].value = '';
+            }
+        }
+
+        function addVariable() {
+            const variablesDiv = document.getElementById('variables');
+            const newVariableInput = document.createElement('div');
+            newVariableInput.className = 'variable-input';
+            newVariableInput.innerHTML = `
+                <input type="text" class="varName" placeholder="Variable Name">
+                <input type="text" class="varValue" placeholder="Variable Value">
+            `;
+            variablesDiv.appendChild(newVariableInput);
+        }
+
+        function copyToClipboard() {
+            const generatedTemplate = document.getElementById('generatedTemplate');
+            generatedTemplate.select();
+            document.execCommand('copy');
+        }
+
+        function ensureAllVariablesInTemplate() {
+            const template = document.getElementById('template').value;
+            const varNames = Array.from(document.getElementsByClassName('varName')).map(input => input.value).filter(name => name);
+            const regex = /{([^}]+)}/g;
+            let match;
+
+            varNames.forEach(varName => {
+                const regexVar = new RegExp(`{${varName}}`, 'g');
+                if (!regexVar.test(template)) {
+                    // Add variable to the top of the template
+                    document.getElementById('template').value = `{${varName}}\n` + template;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
+``` ▋
